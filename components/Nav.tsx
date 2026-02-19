@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { getSessionUser } from '@/lib/auth'
 import { LogoutButton } from './LogoutButton'
 
-export async async function Nav() {
+export async function Nav() {
   const user = await getSessionUser()
 
   return (
