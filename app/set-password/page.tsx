@@ -1,8 +1,8 @@
 export default function SetPasswordPage() {
   return (
-    <div>
-      <h1>Set Password</h1>
-    </div>
+    <main>
+      <h1>Set your password</h1>
+      {/* Your form goes here */}
+    </main>
   )
 }
-
