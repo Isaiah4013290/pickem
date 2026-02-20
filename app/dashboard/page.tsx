@@ -21,6 +21,13 @@ export default async function DashboardPage() {
     .order('created_at', { ascending: false })
     .limit(20)
 
+  const { data: parlays } = await supabase
+    .from('parlays')
+    .select('*, parlay_legs(*, questions(question))')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
   const graded = picks?.filter(p => p.is_correct !== null) ?? []
   const correct = graded.filter(p => p.is_correct === true).length
   const total = graded.length
@@ -32,7 +39,13 @@ export default async function DashboardPage() {
     else break
   }
 
-  const { data: lb } = await supabase.from('leaderboard').select('id')
+  const { data: lb } = await supabase
+    .from('users')
+    .select('id')
+    .eq('status', 'approved')
+    .eq('is_admin', false)
+    .order('coins', { ascending: false })
+
   const rank = (lb?.findIndex(e => e.id === user.id) ?? -1) + 1
 
   return (
@@ -57,7 +70,7 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8">
+      <div className="grid md:grid-cols-2 gap-8 mb-8">
         <div>
           <h2 className="font-syne text-xl font-bold mb-4">Pick History</h2>
           {(picks ?? []).length === 0 ? (
@@ -67,10 +80,7 @@ export default async function DashboardPage() {
               {picks!.map(pick => {
                 const q = pick.questions as any
                 return (
-                  <div key={pick.id} className={`card p-4 flex items-center justify-between gap-3 ${
-                    pick.is_correct === true ? 'border-green-900/40' :
-                    pick.is_correct === false ? 'border-red-900/40' : ''
-                  }`}>
+                  <div key={pick.id} className="card p-4 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{q?.question}</p>
                       <p className="text-xs text-slate-400 mt-0.5">
@@ -79,14 +89,8 @@ export default async function DashboardPage() {
                       </p>
                     </div>
                     <div className="flex-shrink-0 text-right">
-                      {pick.is_correct === true && <div>
-                        <span className="text-green-400">✅</span>
-                        {pick.payout != null && <p className="text-xs text-green-400">+{pick.payout}🪙</p>}
-                      </div>}
-                      {pick.is_correct === false && <div>
-                        <span className="text-red-400">❌</span>
-                        {pick.payout != null && <p className="text-xs text-red-400">{pick.payout}🪙</p>}
-                      </div>}
+                      {pick.is_correct === true && <div><span className="text-green-400">✅</span>{pick.payout != null && <p className="text-xs text-green-400">+{pick.payout}🪙</p>}</div>}
+                      {pick.is_correct === false && <div><span className="text-red-400">❌</span>{pick.payout != null && <p className="text-xs text-red-400">{pick.payout}🪙</p>}</div>}
                       {pick.is_correct === null && <span className="text-xs text-slate-600 bg-slate-800 px-2 py-1 rounded-full">Pending</span>}
                     </div>
                   </div>
@@ -114,6 +118,31 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
-    </div>
-  )
-}
+
+      {/* Parlay History */}
+      <div>
+        <h2 className="font-syne text-xl font-bold mb-4">Parlay History</h2>
+        {(parlays ?? []).length === 0 ? (
+          <div className="text-center py-12 text-slate-500 text-sm card">No parlays yet</div>
+        ) : (
+          <div className="space-y-3">
+            {parlays!.map(parlay => (
+              <div key={parlay.id} className={`card p-4 border ${
+                parlay.status === 'won' ? 'border-green-900/40' :
+                parlay.status === 'lost' ? 'border-red-900/40' : 'border-slate-800'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-syne font-bold text-sm">
+                      {parlay.legs_count}-leg Parlay
+                    </span>
+                    <span className="text-xs text-amber-400">{parlay.multiplier}x</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      parlay.status === 'won' ? 'bg-green-900/40 text-green-400' :
+                      parlay.status === 'lost' ? 'bg-red-900/40 text-red-400' :
+                      'bg-slate-800 text-slate-400'
+                    }`}>
+                      {parlay.status === 'won' ? '✅ Won' : parlay.status === 'lost' ? '❌ Lost' : '⏳ Pending'}
+                    </span>
