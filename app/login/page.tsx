@@ -1,59 +1,77 @@
-'use client';
+'use client'
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const router = useRouter();
+  const router = useRouter()
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
     const res = await fetch('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
-      headers: { 'Content-Type': 'application/json' }
-    });
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username.trim(), password }),
+    })
 
-    const data = await res.json();
+    const data = await res.json()
 
-    if (res.ok && data.success) {
-      router.push('/dashboard');
-    } else if (data.needsPassword) {
-      // THIS IS THE KICK: It sends you to set-password with your ID
-      router.push(`/set-password?userId=${data.userId}`);
-    } else {
-      alert(data.error || 'Invalid login');
+    if (!res.ok) {
+      setError(data.error)
+      setLoading(false)
+      return
     }
-  };
+
+    if (data.needsPassword) {
+      router.push(`/set-password?user=${data.user}`)
+      return
+    }
+
+    router.push('/games')
+    router.refresh()
+  }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-950 p-4">
-      <div className="w-full max-w-md p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
-        <h1 className="text-2xl font-bold text-white text-center mb-8">Sign In</h1>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full p-3 bg-slate-950 border border-slate-800 text-white rounded-lg outline-none focus:border-amber-400"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-3 bg-slate-950 border border-slate-800 text-white rounded-lg outline-none focus:border-amber-400"
-          />
-          <button type="submit" className="w-full p-3 bg-amber-400 text-black font-bold rounded-lg hover:bg-amber-300 transition-colors">
-            Sign In →
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-slate-950">
+      <div className="mb-8 text-center">
+        <h1 className="font-syne text-3xl font-extrabold">
+          <span className="text-amber-400">Pick</span><span className="text-slate-100">'em</span>
+        </h1>
+        <p className="text-slate-500 text-sm mt-1">High School Sports Predictions</p>
+      </div>
+
+      <div className="w-full max-w-sm card p-8">
+        <h2 className="font-syne text-xl font-bold mb-6">Sign in</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm text-slate-400 block mb-1.5">Username</label>
+            <input type="text" value={username} onChange={e => setUsername(e.target.value)}
+              className="input-field" placeholder="your username" required />
+          </div>
+          <div>
+            <label className="text-sm text-slate-400 block mb-1.5">Password</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+              className="input-field" placeholder="••••••••" required />
+          </div>
+
+          {error && (
+            <p className="text-red-400 text-sm bg-red-950/30 border border-red-900/50 rounded-xl px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <button type="submit" disabled={loading} className="btn-primary w-full">
+            {loading ? 'Signing in...' : 'Sign in →'}
           </button>
         </form>
-      </div>
-    </main>
-  );
-}
+
+        <p className="text-center text
