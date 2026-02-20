@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { CommentSection } from './CommentSection'
 
 interface Props {
   question: any
@@ -146,6 +147,9 @@ export function PickCard({ question, userPick, userCoins }: Props) {
           {question.status === 'graded' ? `Answer: ${question.correct_answer?.toUpperCase()} · No pick made` : 'Closed — no pick made'}
         </div>
       )}
+
+      {/* Comments */}
+      <CommentSection questionId={question.id} userPick={userPick?.pick} />
     </div>
   )
 }
