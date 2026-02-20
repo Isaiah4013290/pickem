@@ -46,7 +46,14 @@ export default async function DashboardPage() {
     .eq('is_admin', false)
     .order('coins', { ascending: false })
 
-  const rank = (lb?.findIndex(e => e.id === user.id) ?? -1) + 1
+  const rank = (lb?.findIndex((e: any) => e.id === user.id) ?? -1) + 1
+
+  const stats = [
+    { label: 'Coins', value: `${user.coins} 🪙`, color: 'text-amber-400' },
+    { label: 'Accuracy', value: `${accuracy}%`, color: accuracy >= 60 ? 'text-green-400' : 'text-slate-200' },
+    { label: 'Streak', value: streak > 0 ? `${streak} 🔥` : '0', color: streak > 2 ? 'text-orange-400' : 'text-slate-200' },
+    { label: 'Rank', value: rank > 0 ? `#${rank}` : '—', color: 'text-amber-400' },
+  ]
 
   return (
     <div>
@@ -57,12 +64,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-        {[
-          { label: 'Coins', value: `${user.coins} 🪙`, color: 'text-amber-400' },
-          { label: 'Accuracy', value: `${accuracy}%`, color: accuracy >= 60 ? 'text-green-400' : 'text-slate-200' },
-          { label: 'Streak', value: streak > 0 ? `${streak} 🔥` : '0', color: streak > 2 ? 'text-orange-400' : 'text-slate-200' },
-          { label: 'Rank', value: rank > 0 ? `#${rank}` : '—', color: 'text-amber-400' },
-        ].map(s => (
+        {stats.map(s => (
           <div key={s.label} className="card p-5">
             <p className="text-xs text-slate-500 mb-1">{s.label}</p>
             <p className={`font-syne text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -119,23 +121,20 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Parlay History */}
       <div>
         <h2 className="font-syne text-xl font-bold mb-4">Parlay History</h2>
         {(parlays ?? []).length === 0 ? (
           <div className="text-center py-12 text-slate-500 text-sm card">No parlays yet</div>
         ) : (
           <div className="space-y-3">
-            {parlays!.map(parlay => (
+            {parlays!.map((parlay: any) => (
               <div key={parlay.id} className={`card p-4 border ${
                 parlay.status === 'won' ? 'border-green-900/40' :
                 parlay.status === 'lost' ? 'border-red-900/40' : 'border-slate-800'
               }`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-syne font-bold text-sm">
-                      {parlay.legs_count}-leg Parlay
-                    </span>
+                    <span className="font-syne font-bold text-sm">{parlay.legs_count}-leg Parlay</span>
                     <span className="text-xs text-amber-400">{parlay.multiplier}x</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -146,3 +145,33 @@ export default async function DashboardPage() {
                     }`}>
                       {parlay.status === 'won' ? '✅ Won' : parlay.status === 'lost' ? '❌ Lost' : '⏳ Pending'}
                     </span>
+                    <span className={`text-sm font-bold ${
+                      parlay.status === 'won' ? 'text-green-400' :
+                      parlay.status === 'lost' ? 'text-red-400' : 'text-slate-400'
+                    }`}>
+                      {parlay.status === 'won' ? `+${parlay.payout}🪙` :
+                       parlay.status === 'lost' ? `-${parlay.wager}🪙` : `${parlay.wager}🪙 wagered`}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  {parlay.parlay_legs?.map((leg: any) => (
+                    <div key={leg.id} className="flex items-center gap-2 text-xs text-slate-400">
+                      <span className={leg.is_correct === true ? 'text-green-400' : leg.is_correct === false ? 'text-red-400' : 'text-slate-600'}>
+                        {leg.is_correct === true ? '✅' : leg.is_correct === false ? '❌' : '⏳'}
+                      </span>
+                      <span className={`font-bold ${leg.pick === 'yes' ? 'text-green-400' : 'text-red-400'}`}>
+                        {leg.pick.toUpperCase()}
+                      </span>
+                      <span className="truncate">{leg.questions?.question}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
