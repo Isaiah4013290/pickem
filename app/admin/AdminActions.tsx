@@ -17,6 +17,8 @@ export function AdminActions({ questions, pendingUsers, allUsers }: Props) {
   const [closeDate, setCloseDate] = useState('')
   const [closeTime, setCloseTime] = useState('')
   const [questionText, setQuestionText] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
 
   const flash = (m: string) => {
     setMsg(m)
@@ -95,6 +97,19 @@ export function AdminActions({ questions, pendingUsers, allUsers }: Props) {
     })
   }
 
+  const saveEdit = async (questionId: string) => {
+    if (!editText.trim()) { flash('❌ Question cannot be empty'); return }
+    startTransition(async () => {
+      const res = await fetch('/api/admin/games', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId, question: editText }),
+      })
+      if (res.ok) { flash('✅ Question updated!'); setEditingId(null); router.refresh() }
+      else flash('❌ Error updating question')
+    })
+  }
+
   const tabs = [
     { key: 'questions', label: 'Questions' },
     { key: 'create', label: '+ Create' },
@@ -160,7 +175,25 @@ export function AdminActions({ questions, pendingUsers, allUsers }: Props) {
           ) : questions.map(q => (
             <div key={q.id} className="card p-5">
               <div className="flex items-start justify-between gap-4 mb-3">
-                <p className="font-syne font-semibold">{q.question}</p>
+                {editingId === q.id ? (
+                  <div className="flex-1 space-y-2">
+                    <textarea
+                      value={editText}
+                      onChange={e => setEditText(e.target.value)}
+                      className="w-full bg-slate-800 border border-amber-500 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none resize-none"
+                      rows={2}
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={() => saveEdit(q.id)} disabled={isPending}
+                        className="btn-primary text-xs px-3 py-1.5">Save</button>
+                      <button onClick={() => setEditingId(null)}
+                        className="text-xs px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-slate-200">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="font-syne font-semibold flex-1">{q.question}</p>
+                )}
+
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className={`text-xs px-2 py-1 rounded-full ${
                     q.status === 'graded' ? 'bg-slate-800 text-slate-400' :
@@ -170,6 +203,14 @@ export function AdminActions({ questions, pendingUsers, allUsers }: Props) {
                     {q.status === 'graded' ? `Graded: ${q.correct_answer?.toUpperCase()}` :
                      new Date(q.closes_at) <= new Date() ? 'Closed' : 'Open'}
                   </span>
+                  {editingId !== q.id && (
+                    <button
+                      onClick={() => { setEditingId(q.id); setEditText(q.question) }}
+                      className="text-xs px-2 py-1 rounded-lg bg-slate-700 text-slate-400 hover:bg-slate-600 transition-colors"
+                    >
+                      ✏️
+                    </button>
+                  )}
                   <button
                     onClick={() => deleteQuestion(q.id)}
                     disabled={isPending}
@@ -179,9 +220,11 @@ export function AdminActions({ questions, pendingUsers, allUsers }: Props) {
                   </button>
                 </div>
               </div>
+
               <p className="text-xs text-slate-500 mb-4">
                 Closes: {new Date(q.closes_at).toLocaleString()}
               </p>
+
               {q.status !== 'graded' && (
                 <div>
                   <p className="text-xs text-slate-500 mb-2">Set correct answer:</p>
