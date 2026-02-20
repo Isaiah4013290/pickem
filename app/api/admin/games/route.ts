@@ -2,21 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSessionUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
+// Create question
 export async function POST(req: NextRequest) {
   const user = await getSessionUser()
   if (!user?.is_admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { sport_id, home_team, away_team, game_date, game_time, location } = await req.json()
+  const { question, closes_at } = await req.json()
 
-  const fullDateTime = new Date(`${game_date}T${game_time}`).toISOString()
+  if (!question || !closes_at) {
+    return NextResponse.json({ error: 'Question and close time are required' }, { status: 400 })
+  }
 
-  const { error } = await supabase.from('games').insert({
-    sport_id,
-    home_team,
-    away_team,
-    game_date,
-    game_time: fullDateTime,
-    location: location || null,
+  const { error } = await supabase.from('questions').insert({
+    question,
+    closes_at: new Date(closes_at).toISOString(),
+    status: 'open',
   })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -24,21 +24,21 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true })
 }
 
+// Set correct answer
 export async function PATCH(req: NextRequest) {
   const user = await getSessionUser()
   if (!user?.is_admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { gameId, homeScore, awayScore } = await req.json()
+  const { questionId, correct_answer } = await req.json()
 
-  let winner: 'home' | 'away' | 'tie'
-  if (homeScore > awayScore) winner = 'home'
-  else if (awayScore > homeScore) winner = 'away'
-  else winner = 'tie'
+  if (!['yes', 'no'].includes(correct_answer)) {
+    return NextResponse.json({ error: 'Answer must be yes or no' }, { status: 400 })
+  }
 
   const { error } = await supabase
-    .from('games')
-    .update({ status: 'final', home_score: homeScore, away_score: awayScore, winner })
-    .eq('id', gameId)
+    .from('questions')
+    .update({ correct_answer, status: 'graded' })
+    .eq('id', questionId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
