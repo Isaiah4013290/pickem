@@ -2,20 +2,21 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatDate, formatTime } from '@/lib/utils'
 
 interface Props {
-  sports: any[]
-  games: any[]
+  questions: any[]
   pendingUsers: any[]
   allUsers: any[]
 }
 
-export function AdminActions({ sports, games, pendingUsers, allUsers }: Props) {
+export function AdminActions({ questions, pendingUsers, allUsers }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [activeTab, setActiveTab] = useState<'users' | 'games' | 'create'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'questions' | 'create'>('questions')
   const [msg, setMsg] = useState('')
+  const [closeDate, setCloseDate] = useState('')
+  const [closeTime, setCloseTime] = useState('')
+  const [questionText, setQuestionText] = useState('')
 
   const flash = (m: string) => {
     setMsg(m)
@@ -46,58 +47,45 @@ export function AdminActions({ sports, games, pendingUsers, allUsers }: Props) {
     })
   }
 
-  const enterScore = async (e: React.FormEvent<HTMLFormElement>, gameId: string) => {
+  const createQuestion = async (e: React.FormEvent) => {
     e.preventDefault()
-    const form = e.currentTarget
-    const homeScore = parseInt((form.elements.namedItem('home_score') as HTMLInputElement).value)
-    const awayScore = parseInt((form.elements.namedItem('away_score') as HTMLInputElement).value)
-
-    startTransition(async () => {
-      const res = await fetch('/api/admin/games', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameId, homeScore, awayScore }),
-      })
-      if (res.ok) { flash('✅ Score saved!'); router.refresh() }
-      else flash('❌ Error saving score')
-    })
-  }
-
-  const createGame = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const form = e.currentTarget
-    const data = {
-      sport_id: (form.elements.namedItem('sport_id') as HTMLSelectElement).value,
-      away_team: (form.elements.namedItem('away_team') as HTMLInputElement).value,
-      home_team: (form.elements.namedItem('home_team') as HTMLInputElement).value,
-      game_date: (form.elements.namedItem('game_date') as HTMLInputElement).value,
-      game_time: (form.elements.namedItem('game_time') as HTMLInputElement).value,
-      location: (form.elements.namedItem('location') as HTMLInputElement).value,
+    if (!questionText || !closeDate || !closeTime) {
+      flash('❌ Fill in all fields')
+      return
     }
-
+    const closes_at = new Date(`${closeDate}T${closeTime}`).toISOString()
     startTransition(async () => {
       const res = await fetch('/api/admin/games', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ question: questionText, closes_at }),
       })
-      if (res.ok) { flash('✅ Game created!'); form.reset(); router.refresh() }
-      else flash('❌ Error creating game')
+      if (res.ok) {
+        flash('✅ Question created!')
+        setQuestionText('')
+        setCloseDate('')
+        setCloseTime('')
+        router.refresh()
+      } else flash('❌ Error creating question')
     })
   }
 
-  const awardWeeklyCoins = async () => {
+  const setAnswer = async (questionId: string, answer: 'yes' | 'no') => {
     startTransition(async () => {
-      const res = await fetch('/api/admin/weekly-coins', { method: 'POST' })
-      if (res.ok) { flash('✅ +15 coins awarded to all users!'); router.refresh() }
-      else flash('❌ Error awarding coins')
+      const res = await fetch('/api/admin/games', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId, correct_answer: answer }),
+      })
+      if (res.ok) { flash(`✅ Answer set to ${answer.toUpperCase()}!`); router.refresh() }
+      else flash('❌ Error setting answer')
     })
   }
 
   const tabs = [
-    { key: 'users', label: `Users ${pendingUsers.length > 0 ? `(${pendingUsers.length} pending)` : ''}` },
-    { key: 'games', label: 'Games' },
-    { key: 'create', label: 'Create Game' },
+    { key: 'questions', label: 'Questions' },
+    { key: 'create', label: '+ Create' },
+    { key: 'users', label: `Users${pendingUsers.length > 0 ? ` (${pendingUsers.length})` : ''}` },
   ] as const
 
   return (
@@ -108,25 +96,91 @@ export function AdminActions({ sports, games, pendingUsers, allUsers }: Props) {
 
       <div className="flex gap-2 mb-6 border-b border-slate-800 pb-4 flex-wrap">
         {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
+          <button key={t.key} onClick={() => setActiveTab(t.key)}
             className={`text-sm px-4 py-2 rounded-xl transition-colors ${
               activeTab === t.key ? 'bg-amber-500 text-slate-950 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-            }`}
-          >
+            }`}>
             {t.label}
           </button>
         ))}
-        <button
-          onClick={awardWeeklyCoins}
-          disabled={isPending}
-          className="ml-auto text-sm px-4 py-2 rounded-xl bg-green-900/40 border border-green-800/50 text-green-300 hover:bg-green-900/60 transition-colors"
-        >
-          +15 Weekly Coins 🪙
-        </button>
       </div>
 
+      {/* Create Question */}
+      {activeTab === 'create' && (
+        <div className="max-w-lg">
+          <form onSubmit={createQuestion} className="card p-6 space-y-4">
+            <div>
+              <label className="text-sm text-slate-400 block mb-1.5">Question</label>
+              <textarea
+                value={questionText}
+                onChange={e => setQuestionText(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 text-sm resize-none"
+                placeholder="Will Highland Springs beat Freeman?"
+                rows={3}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-slate-400 block mb-1.5">Close Date</label>
+                <input type="date" value={closeDate} onChange={e => setCloseDate(e.target.value)}
+                  className="input-field" required />
+              </div>
+              <div>
+                <label className="text-sm text-slate-400 block mb-1.5">Close Time</label>
+                <input type="time" value={closeTime} onChange={e => setCloseTime(e.target.value)}
+                  className="input-field" required />
+              </div>
+            </div>
+            <button type="submit" disabled={isPending} className="btn-primary w-full">
+              {isPending ? 'Creating...' : 'Create Question'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Questions list */}
+      {activeTab === 'questions' && (
+        <div className="space-y-3">
+          {questions.length === 0 ? (
+            <div className="text-center py-16 text-slate-500 card">No questions yet — create one!</div>
+          ) : questions.map(q => (
+            <div key={q.id} className="card p-5">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <p className="font-syne font-semibold">{q.question}</p>
+                <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
+                  q.status === 'graded' ? 'bg-slate-800 text-slate-400' :
+                  new Date(q.closes_at) <= new Date() ? 'bg-red-900/40 text-red-400' :
+                  'bg-green-900/40 text-green-400'
+                }`}>
+                  {q.status === 'graded' ? `Graded: ${q.correct_answer?.toUpperCase()}` :
+                   new Date(q.closes_at) <= new Date() ? 'Closed' : 'Open'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mb-4">
+                Closes: {new Date(q.closes_at).toLocaleString()}
+              </p>
+              {q.status !== 'graded' && (
+                <div>
+                  <p className="text-xs text-slate-500 mb-2">Set correct answer:</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setAnswer(q.id, 'yes')} disabled={isPending}
+                      className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-green-900/30 border-2 border-green-700 text-green-400 hover:bg-green-900/50 transition-colors">
+                      ✓ YES
+                    </button>
+                    <button onClick={() => setAnswer(q.id, 'no')} disabled={isPending}
+                      className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-red-900/30 border-2 border-red-700 text-red-400 hover:bg-red-900/50 transition-colors">
+                      ✗ NO
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Users */}
       {activeTab === 'users' && (
         <div className="space-y-6">
           {pendingUsers.length > 0 && (
@@ -150,7 +204,6 @@ export function AdminActions({ sports, games, pendingUsers, allUsers }: Props) {
               </div>
             </div>
           )}
-
           <div>
             <h2 className="font-syne text-lg font-bold mb-3">All Users</h2>
             <div className="card overflow-hidden">
@@ -168,9 +221,7 @@ export function AdminActions({ sports, games, pendingUsers, allUsers }: Props) {
                       u.status === 'approved' ? 'bg-green-900/40 text-green-400' :
                       u.status === 'pending' ? 'bg-amber-900/40 text-amber-400' :
                       'bg-red-900/40 text-red-400'
-                    }`}>
-                      {u.status}
-                    </span>
+                    }`}>{u.status}</span>
                   </div>
                   <div className="col-span-3 text-center text-amber-400">{u.coins}</div>
                   <div className="col-span-2 text-right text-slate-500">{new Date(u.created_at).toLocaleDateString()}</div>
@@ -178,91 +229,6 @@ export function AdminActions({ sports, games, pendingUsers, allUsers }: Props) {
               ))}
             </div>
           </div>
-        </div>
-      )}
-
-      {activeTab === 'games' && (
-        <div className="space-y-3">
-          {games.map(game => (
-            <div key={game.id} className="card p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span>{game.sports?.emoji}</span>
-                    <span className="text-xs text-slate-500">{formatDate(game.game_date)} · {formatTime(game.game_time)}</span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      game.status === 'final' ? 'bg-slate-800 text-slate-400' :
-                      game.status === 'live' ? 'bg-green-900/40 text-green-400' : 'bg-amber-900/30 text-amber-400'
-                    }`}>{game.status}</span>
-                  </div>
-                  <p className="font-syne font-semibold">{game.away_team} <span className="text-slate-500">vs</span> {game.home_team}</p>
-                  {game.status === 'final' && (
-                    <p className="text-xs text-slate-500 mt-0.5">Final: {game.away_score}–{game.home_score} · Winner: {game.winner}</p>
-                  )}
-                </div>
-
-                {game.status !== 'final' && (
-                  <form onSubmit={(e) => enterScore(e, game.id)} className="flex items-center gap-2 flex-shrink-0">
-                    <div className="text-center">
-                      <p className="text-xs text-slate-500 mb-1">Away</p>
-                      <input name="away_score" type="number" min="0" required
-                        className="w-14 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-sm focus:outline-none focus:border-amber-500" placeholder="0" />
-                    </div>
-                    <span className="text-slate-600 mt-4">–</span>
-                    <div className="text-center">
-                      <p className="text-xs text-slate-500 mb-1">Home</p>
-                      <input name="home_score" type="number" min="0" required
-                        className="w-14 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-center text-sm focus:outline-none focus:border-amber-500" placeholder="0" />
-                    </div>
-                    <div className="mt-4">
-                      <button type="submit" disabled={isPending} className="btn-primary text-xs px-3 py-1.5">Save</button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {activeTab === 'create' && (
-        <div className="max-w-md">
-          <form onSubmit={createGame} className="card p-6 space-y-4">
-            <div>
-              <label className="text-sm text-slate-400 block mb-1.5">Sport</label>
-              <select name="sport_id" required className="input-field">
-                <option value="">Select sport...</option>
-                {sports.map(s => <option key={s.id} value={s.id}>{s.emoji} {s.name}</option>)}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-slate-400 block mb-1.5">Away Team</label>
-                <input name="away_team" type="text" required className="input-field" placeholder="Visitors" />
-              </div>
-              <div>
-                <label className="text-sm text-slate-400 block mb-1.5">Home Team</label>
-                <input name="home_team" type="text" required className="input-field" placeholder="Home" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm text-slate-400 block mb-1.5">Date</label>
-                <input name="game_date" type="date" required className="input-field" />
-              </div>
-              <div>
-                <label className="text-sm text-slate-400 block mb-1.5">Time</label>
-                <input name="game_time" type="time" required className="input-field" />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm text-slate-400 block mb-1.5">Location (optional)</label>
-              <input name="location" type="text" className="input-field" placeholder="Stadium name" />
-            </div>
-            <button type="submit" disabled={isPending} className="btn-primary w-full">
-              {isPending ? 'Creating...' : 'Create Game'}
-            </button>
-          </form>
         </div>
       )}
     </div>
