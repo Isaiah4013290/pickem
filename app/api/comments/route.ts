@@ -9,12 +9,28 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from('comments')
-    .select('id, text, created_at, users(username)')
+    .select('id, text, created_at, user_id')
     .eq('question_id', questionId)
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ comments: data })
+
+  const userIds = [...new Set(data?.map(c => c.user_id) ?? [])]
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, username')
+    .in('id', userIds)
+
+  const usersMap = new Map(users?.map(u => [u.id, u.username]) ?? [])
+
+  const comments = data?.map(c => ({
+    id: c.id,
+    text: c.text,
+    created_at: c.created_at,
+    users: { username: usersMap.get(c.user_id) ?? 'Unknown' }
+  }))
+
+  return NextResponse.json({ comments })
 }
 
 export async function POST(req: NextRequest) {
