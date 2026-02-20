@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-import { formatDate } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +10,7 @@ export default async function DashboardPage() {
 
   const { data: picks } = await supabase
     .from('picks')
-    .select('*, games(*, sports(*))')
+    .select('*, questions(*)')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
@@ -28,10 +27,7 @@ export default async function DashboardPage() {
   const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0
 
   let streak = 0
-  const sorted = [...graded].sort((a, b) =>
-    new Date((b.games as any)?.game_time ?? 0).getTime() - new Date((a.games as any)?.game_time ?? 0).getTime()
-  )
-  for (const p of sorted) {
+  for (const p of graded) {
     if (p.is_correct) streak++
     else break
   }
@@ -69,18 +65,16 @@ export default async function DashboardPage() {
           ) : (
             <div className="space-y-2">
               {picks!.map(pick => {
-                const game = pick.games as any
-                const pickedTeam = pick.pick === 'home' ? game?.home_team : game?.away_team
+                const q = pick.questions as any
                 return (
                   <div key={pick.id} className={`card p-4 flex items-center justify-between gap-3 ${
                     pick.is_correct === true ? 'border-green-900/40' :
                     pick.is_correct === false ? 'border-red-900/40' : ''
                   }`}>
                     <div className="min-w-0">
-                      <p className="text-xs text-slate-500 mb-0.5">{game?.sports?.emoji} {formatDate(game?.game_date)}</p>
-                      <p className="text-sm font-medium truncate">{game?.away_team} vs {game?.home_team}</p>
+                      <p className="text-sm font-medium truncate">{q?.question}</p>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Pick: <span className="text-slate-200">{pickedTeam}</span>
+                        Picked: <span className="font-bold">{pick.pick.toUpperCase()}</span>
                         {pick.wager > 0 && <span className="ml-2 text-amber-500">{pick.wager}🪙</span>}
                       </p>
                     </div>
