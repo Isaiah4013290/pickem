@@ -96,3 +96,20 @@ export interface Game {
   time: string;
   comments: Comment[]; // Array to store the chat
 }
+export interface Comment {
+  id: string;
+  userName: string;
+  text: string;
+  teamPicked: string; 
+  createdAt: number;
+}
+
+// Update your Game interface to include comments
+// If you already have 'interface Game', just add the line below inside it
+export interface Game {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
+  time: string;
+  comments: Comment[]; 
+}
