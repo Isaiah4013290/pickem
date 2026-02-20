@@ -82,6 +82,19 @@ export function AdminActions({ questions, pendingUsers, allUsers }: Props) {
     })
   }
 
+  const deleteQuestion = async (questionId: string) => {
+    if (!confirm('Delete this question? This cannot be undone.')) return
+    startTransition(async () => {
+      const res = await fetch('/api/admin/games', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId }),
+      })
+      if (res.ok) { flash('🗑️ Question deleted!'); router.refresh() }
+      else flash('❌ Error deleting question')
+    })
+  }
+
   const tabs = [
     { key: 'questions', label: 'Questions' },
     { key: 'create', label: '+ Create' },
@@ -148,14 +161,23 @@ export function AdminActions({ questions, pendingUsers, allUsers }: Props) {
             <div key={q.id} className="card p-5">
               <div className="flex items-start justify-between gap-4 mb-3">
                 <p className="font-syne font-semibold">{q.question}</p>
-                <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
-                  q.status === 'graded' ? 'bg-slate-800 text-slate-400' :
-                  new Date(q.closes_at) <= new Date() ? 'bg-red-900/40 text-red-400' :
-                  'bg-green-900/40 text-green-400'
-                }`}>
-                  {q.status === 'graded' ? `Graded: ${q.correct_answer?.toUpperCase()}` :
-                   new Date(q.closes_at) <= new Date() ? 'Closed' : 'Open'}
-                </span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    q.status === 'graded' ? 'bg-slate-800 text-slate-400' :
+                    new Date(q.closes_at) <= new Date() ? 'bg-red-900/40 text-red-400' :
+                    'bg-green-900/40 text-green-400'
+                  }`}>
+                    {q.status === 'graded' ? `Graded: ${q.correct_answer?.toUpperCase()}` :
+                     new Date(q.closes_at) <= new Date() ? 'Closed' : 'Open'}
+                  </span>
+                  <button
+                    onClick={() => deleteQuestion(q.id)}
+                    disabled={isPending}
+                    className="text-xs px-2 py-1 rounded-lg bg-red-900/40 border border-red-800/50 text-red-400 hover:bg-red-900/60 transition-colors"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
               <p className="text-xs text-slate-500 mb-4">
                 Closes: {new Date(q.closes_at).toLocaleString()}
