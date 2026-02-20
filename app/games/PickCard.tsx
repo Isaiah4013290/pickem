@@ -3,20 +3,27 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { CommentSection } from './CommentSection'
+import { ParlayLeg } from './ParlayTray'
 
 interface Props {
   question: any
   userPick: any
   userCoins: number
+  parlayLegs: ParlayLeg[]
+  onAddToParlay: (leg: ParlayLeg) => void
+  onRemoveFromParlay: (questionId: string) => void
 }
 
-export function PickCard({ question, userPick, userCoins }: Props) {
+export function PickCard({ question, userPick, userCoins, parlayLegs, onAddToParlay, onRemoveFromParlay }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedPick, setSelectedPick] = useState<'yes' | 'no' | null>(userPick?.pick ?? null)
   const [wager, setWager] = useState<number>(userPick?.wager ?? 0)
   const [error, setError] = useState('')
+  const [parlayPick, setParlayPick] = useState<'yes' | 'no' | null>(null)
   const locked = new Date(question.closes_at) <= new Date()
+  const isOpen = question.status === 'open' && !locked
+  const inParlay = parlayLegs.find(l => l.questionId === question.id)
 
   const submitPick = (pick: 'yes' | 'no', wagerAmount: number) => {
     setError('')
@@ -27,11 +34,8 @@ export function PickCard({ question, userPick, userCoins }: Props) {
         body: JSON.stringify({ questionId: question.id, pick, wager: wagerAmount }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        setError(data.error)
-      } else {
-        router.refresh()
-      }
+      if (!res.ok) setError(data.error)
+      else router.refresh()
     })
   }
 
@@ -46,7 +50,10 @@ export function PickCard({ question, userPick, userCoins }: Props) {
     submitPick(selectedPick, wager)
   }
 
-  const isOpen = question.status === 'open' && !locked
+  const handleParlayPick = (pick: 'yes' | 'no') => {
+    setParlayPick(pick)
+    onAddToParlay({ questionId: question.id, question: question.question, pick })
+  }
 
   return (
     <div className="card p-6">
@@ -62,37 +69,30 @@ export function PickCard({ question, userPick, userCoins }: Props) {
         </span>
       </div>
 
-      {/* Closes at */}
       {isOpen && (
         <p className="text-xs text-slate-500 mb-4">
           🔓 Closes {new Date(question.closes_at).toLocaleString()}
         </p>
       )}
 
-      {/* Yes/No buttons */}
+      {/* Single pick */}
       {isOpen ? (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => handlePick('yes')}
-              disabled={isPending}
+            <button onClick={() => handlePick('yes')} disabled={isPending}
               className={`py-3 rounded-xl font-bold text-sm transition-all border-2 ${
                 selectedPick === 'yes'
                   ? 'bg-green-500 border-green-400 text-white shadow-lg shadow-green-900/30'
                   : 'bg-green-900/20 border-green-800/50 text-green-400 hover:bg-green-900/40'
-              }`}
-            >
+              }`}>
               {selectedPick === 'yes' ? '✓ ' : ''}YES
             </button>
-            <button
-              onClick={() => handlePick('no')}
-              disabled={isPending}
+            <button onClick={() => handlePick('no')} disabled={isPending}
               className={`py-3 rounded-xl font-bold text-sm transition-all border-2 ${
                 selectedPick === 'no'
                   ? 'bg-red-500 border-red-400 text-white shadow-lg shadow-red-900/30'
                   : 'bg-red-900/20 border-red-800/50 text-red-400 hover:bg-red-900/40'
-              }`}
-            >
+              }`}>
               {selectedPick === 'no' ? '✓ ' : ''}NO
             </button>
           </div>
@@ -101,27 +101,43 @@ export function PickCard({ question, userPick, userCoins }: Props) {
             <div className="flex items-center gap-2 pt-1">
               <div className="flex items-center gap-1.5 flex-1">
                 <span className="text-xs text-slate-500">Wager</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={userCoins + (userPick?.wager ?? 0)}
-                  value={wager}
+                <input type="number" min={0} max={userCoins + (userPick?.wager ?? 0)} value={wager}
                   onChange={e => setWager(Math.min(parseInt(e.target.value) || 0, userCoins + (userPick?.wager ?? 0)))}
-                  className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-amber-500"
-                />
+                  className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-amber-500" />
                 <span className="text-xs text-slate-500">🪙 = win {wager * 2}🪙</span>
               </div>
-              <button
-                onClick={handleWagerSubmit}
-                disabled={isPending}
-                className="btn-primary text-xs px-3 py-1.5"
-              >
+              <button onClick={handleWagerSubmit} disabled={isPending} className="btn-primary text-xs px-3 py-1.5">
                 {isPending ? '...' : 'Confirm'}
               </button>
             </div>
           )}
 
           {error && <p className="text-red-400 text-xs">{error}</p>}
+
+          {/* Parlay section */}
+          <div className="border-t border-slate-800 pt-3 mt-2">
+            <p className="text-xs text-slate-500 mb-2">➕ Add to Parlay</p>
+            {inParlay ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-amber-400">
+                  Added as <strong>{inParlay.pick.toUpperCase()}</strong>
+                </span>
+                <button onClick={() => { onRemoveFromParlay(question.id); setParlayPick(null) }}
+                  className="text-xs text-slate-600 hover:text-red-400">Remove</button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => handleParlayPick('yes')}
+                  className="py-1.5 rounded-lg font-bold text-xs border border-green-800/50 text-green-400 hover:bg-green-900/30 transition-colors">
+                  YES (parlay)
+                </button>
+                <button onClick={() => handleParlayPick('no')}
+                  className="py-1.5 rounded-lg font-bold text-xs border border-red-800/50 text-red-400 hover:bg-red-900/30 transition-colors">
+                  NO (parlay)
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       ) : userPick ? (
         <div className={`rounded-xl px-4 py-3 text-sm text-center ${
@@ -148,7 +164,6 @@ export function PickCard({ question, userPick, userCoins }: Props) {
         </div>
       )}
 
-      {/* Comments */}
       <CommentSection questionId={question.id} userPick={userPick?.pick} />
     </div>
   )
