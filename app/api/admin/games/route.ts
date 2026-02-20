@@ -44,3 +44,20 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ success: true })
 }
+
+// Delete question
+export async function DELETE(req: NextRequest) {
+  const user = await getSessionUser()
+  if (!user?.is_admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { questionId } = await req.json()
+
+  const { error } = await supabase
+    .from('questions')
+    .delete()
+    .eq('id', questionId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ success: true })
+}
