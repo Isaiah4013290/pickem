@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionUser } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { settleParlaysForQuestion } from '@/lib/settleParlays'
 
-// Create question
 export async function POST(req: NextRequest) {
   const user = await getSessionUser()
   if (!user?.is_admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -20,11 +20,9 @@ export async function POST(req: NextRequest) {
   })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json({ success: true })
 }
 
-// Set correct answer
 export async function PATCH(req: NextRequest) {
   const user = await getSessionUser()
   if (!user?.is_admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -42,10 +40,23 @@ export async function PATCH(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  await supabase
+    .from('parlay_legs')
+    .update({ is_correct: true })
+    .eq('question_id', questionId)
+    .eq('pick', correct_answer)
+
+  await supabase
+    .from('parlay_legs')
+    .update({ is_correct: false })
+    .eq('question_id', questionId)
+    .neq('pick', correct_answer)
+
+  await settleParlaysForQuestion(questionId)
+
   return NextResponse.json({ success: true })
 }
 
-// Delete question
 export async function DELETE(req: NextRequest) {
   const user = await getSessionUser()
   if (!user?.is_admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -58,6 +69,5 @@ export async function DELETE(req: NextRequest) {
     .eq('id', questionId)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json({ success: true })
 }
