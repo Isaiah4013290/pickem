@@ -80,3 +80,19 @@ export interface SessionUser {
   is_admin: boolean
   coins: number
 }
+
+export interface Comment {
+  id: string;
+  userName: string;
+  text: string;
+  teamPicked: string; // This is the "Trash Talk" booster
+  createdAt: number;
+}
+
+export interface Game {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
+  time: string;
+  comments: Comment[]; // Array to store the chat
+}
