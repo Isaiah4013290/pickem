@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
     const { data: user, error: fetchError } = await supabase
       .from('users')
-      .select('id, username, password_hash, status, is_admin')
+      .select('id, username, password_hash, status, is_admin, first_login_bonus_given')
       .eq('username', username.toLowerCase())
       .maybeSingle()
 
@@ -42,6 +42,20 @@ export async function POST(req: NextRequest) {
     const valid = await verifyPassword(password, user.password_hash)
     if (!valid) {
       return NextResponse.json({ error: 'Incorrect password.' }, { status: 401 })
+    }
+
+    // First login bonus — give 15 coins one time only
+    if (!user.first_login_bonus_given) {
+      await supabase
+        .from('users')
+        .update({ coins: user.coins + 15, first_login_bonus_given: true })
+        .eq('id', user.id)
+
+      await supabase.from('coin_transactions').insert({
+        user_id: user.id,
+        amount: 15,
+        reason: 'First login bonus!',
+      })
     }
 
     await createSession(user.id)
